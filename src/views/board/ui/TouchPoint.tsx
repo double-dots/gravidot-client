@@ -16,7 +16,7 @@ export function TouchPoint({
           <circle
             cx={point.x}
             cy={point.y}
-            r={40}
+            r={35}
             fill="none"
             stroke={LIGHT_MODE}
             strokeWidth={5}

@@ -39,21 +39,18 @@ export interface Database {
           name: string; // text
           created_at: string; // timestamptz
           updated_at: string; // timestamptz
-          transform: Json; // jsonb
         };
         Insert: {
           id?: string;
           name: string;
           created_at?: string;
           updated_at?: string;
-          transform: Json;
         };
         Update: {
           id?: string;
           name?: string;
           created_at?: string;
           updated_at?: string;
-          transform?: Json;
         };
       };
 

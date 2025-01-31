@@ -31,17 +31,17 @@ export async function fetchOrCreateBoard(
 
 async function createBoard(userId: string): Promise<Board> {
   const now = getCurrentTimestamp();
-  const { id, name, transform } = useBoardStore.getState();
+  const { id, name } = useBoardStore.getState();
 
   if (id) {
     log.info(`✅📋 Board already exists in storage: ${id}`);
-    return { id, name, transform };
+    return { id, name };
   }
 
   const { data: boardData, error: boardError } = await supabase
     .from(DBTable.Board)
-    .insert([{ name, transform, created_at: now }])
-    .select("id, name, transform")
+    .insert([{ name, created_at: now }])
+    .select("id, name")
     .maybeSingle();
 
   if (boardError && boardError.code !== "PGRST116") {
@@ -73,7 +73,7 @@ async function createBoard(userId: string): Promise<Board> {
 async function fetchBoardById(boardId: string): Promise<Board | null> {
   const { data, error } = await supabase
     .from(DBTable.Board)
-    .select("id, name, transform")
+    .select("id, name")
     .eq("id", boardId)
     .maybeSingle();
 
@@ -93,7 +93,7 @@ export async function updateBoard(boardId: string, board: Partial<Board>) {
     .from(DBTable.Board)
     .update({ ...board, updated_at: getCurrentTimestamp() })
     .eq("id", boardId)
-    .select("id, name, transform")
+    .select("id, name")
     .single();
 
   if (error) {

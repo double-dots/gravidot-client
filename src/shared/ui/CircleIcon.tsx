@@ -6,7 +6,7 @@ export function CircleIcon() {
       fill="currentColor"
       className="size-4"
     >
-      <circle cx="8" cy="8" r="6" />
+      <circle cx="8" cy="8" r="4" />
     </svg>
   );
 }

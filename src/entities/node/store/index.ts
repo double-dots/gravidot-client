@@ -1,64 +1,51 @@
 import { create } from "zustand";
-import { createJSONStorage, persist } from "zustand/middleware";
-import { DotNode } from "../model";
-import { Shape } from "../model/shape";
+import { GravidotNode, Shape } from "../model";
 
 type NodesState = {
-  nodes: DotNode[];
-  addNode: (node: DotNode) => void;
-  addAllNodes: (nodes: DotNode[]) => void;
-  updateNode: (updatedNode: DotNode) => void;
+  nodes: GravidotNode[];
+  addNode: (node: GravidotNode) => void;
+  addAllNodes: (nodes: GravidotNode[]) => void;
+  updateNode: (updatedNode: GravidotNode) => void;
   removeNode: (nodeId: string) => void;
   updateNodeShape: (nodeId: string, newContent: Partial<Shape>) => void;
   clearNode: () => void;
 };
 
-export const useNodesStore = create<NodesState>()(
-  persist(
-    (set) => ({
+export const useNodesStore = create<NodesState>()((set) => ({
+  nodes: [],
+  addNode: (node: GravidotNode) => {
+    set((state) => ({ nodes: [...state.nodes, node] }));
+  },
+  addAllNodes: (nodes: GravidotNode[]) => {
+    set({ nodes });
+  },
+  updateNode: (updatedNode: GravidotNode) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === updatedNode.id ? { ...updatedNode } : { ...node }
+      ),
+    }));
+  },
+  removeNode: (nodeId: string) => {
+    set((state) => ({
+      nodes: state.nodes.filter((node) => node.id !== nodeId),
+    }));
+  },
+  updateNodeShape: (id, updates) => {
+    set((state) => ({
+      nodes: state.nodes.map((node) =>
+        node.id === id
+          ? {
+              ...node,
+              data: { ...node.data, ...updates },
+            }
+          : { ...node }
+      ),
+    }));
+  },
+  clearNode: () => {
+    set(() => ({
       nodes: [],
-
-      addNode: (node: DotNode) =>
-        set((state) => ({ nodes: [...state.nodes, node] })),
-
-      addAllNodes: (nodes: DotNode[]) => set({ nodes }),
-
-      updateNode: (updatedNode: DotNode) =>
-        set((state) => ({
-          nodes: state.nodes.map((node) =>
-            node.id === updatedNode.id ? updatedNode : node
-          ),
-        })),
-
-      removeNode: (nodeId: string) =>
-        set((state) => ({
-          nodes: state.nodes.filter((node) => node.id !== nodeId),
-        })),
-
-      updateNodeShape: (id, updates) =>
-        set((state) => ({
-          nodes: state.nodes.map((node) =>
-            node.id === id
-              ? {
-                  ...node,
-                  shape: new Shape({ ...node.shape, ...updates }),
-                }
-              : node
-          ),
-        })),
-
-      clearNode: () => {
-        set(() => ({
-          nodes: [],
-        }));
-      },
-    }),
-    {
-      name: "node-storage",
-      storage:
-        typeof window !== "undefined"
-          ? createJSONStorage(() => localStorage)
-          : undefined,
-    }
-  )
-);
+    }));
+  },
+}));

@@ -1,12 +1,21 @@
-import { ColorType, Vertex } from "@/entities/node/model";
-import { Shape } from "@/entities/node/model/shape";
+import {
+  Color,
+  ColorType,
+  GravidotNode,
+  ShapeTypeConst,
+} from "@/entities/node/model";
+import { calculateAngle } from "@/shared/utils/calculateAngle";
+import { calculateDistance } from "@/shared/utils/calculateDistance";
+import { OnNodesChange } from "@xyflow/react";
 import { useCallback, useRef, useState } from "react";
 
 export function useMultiTouch(
   isActive: boolean,
-  selectedShapeIndex: number | null,
-  updateShape: (index: number, changes: Partial<Shape>) => void
+  selectedNodeId: string | null,
+  nodes: GravidotNode[],
+  onNodesChange: OnNodesChange<GravidotNode>
 ) {
+  const isMultiTouchActive = useRef(false);
   const initialDistance = useRef<number | null>(null);
   const initialAngle = useRef<number | null>(null);
   const [touchPoints, setTouchPoints] = useState<{ x: number; y: number }[]>(
@@ -15,31 +24,45 @@ export function useMultiTouch(
   const activeTouchType = useRef<string | null>(null);
   const endTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const updateTouchPoints = (event: TouchEvent) => {
+    const points = Array.from(event.touches).map((touch) => ({
+      x: touch.clientX,
+      y: touch.clientY,
+    }));
+    setTouchPoints(points);
+    return points;
+  };
+
+  const resetMultiTouch = () => {
+    initialDistance.current = null;
+    initialAngle.current = null;
+    setTouchPoints([]);
+    activeTouchType.current = null;
+  };
+
   const handleTouchMove = useCallback(
     (event: TouchEvent) => {
-      if (!isActive || selectedShapeIndex === null) return;
+      if (!isActive || !selectedNodeId) return;
 
       const touchCount = event.touches.length;
       activeTouchType.current = `${touchCount}touch`;
 
+      if (touchCount >= 2) {
+        isMultiTouchActive.current = true;
+      }
+
+      const points = updateTouchPoints(event);
+      const previousNode = nodes.find((node) => node.id === selectedNodeId);
+
+      if (!previousNode) return;
+
       if (touchCount === 2) {
-        const [touch1, touch2] = event.touches;
+        const [touch1, touch2] = points;
 
-        setTouchPoints([
-          { x: touch1.clientX, y: touch1.clientY },
-          { x: touch2.clientX, y: touch2.clientY },
-        ]);
+        const currentDistance = calculateDistance(touch1, touch2);
+        const currentAngle = calculateAngle(touch1, touch2);
 
-        const currentDistance = Math.hypot(
-          touch2.clientX - touch1.clientX,
-          touch2.clientY - touch1.clientY
-        );
-        const currentAngle = Math.atan2(
-          touch2.clientY - touch1.clientY,
-          touch2.clientX - touch1.clientX
-        );
-
-        if (initialDistance.current === null || initialAngle.current === null) {
+        if (!initialDistance.current || !initialAngle.current) {
           initialDistance.current = currentDistance;
           initialAngle.current = currentAngle;
           return;
@@ -52,119 +75,132 @@ export function useMultiTouch(
         const rotation =
           ((currentAngle - initialAngle.current) * 180) / Math.PI;
 
-        updateShape(selectedShapeIndex, { scale, rotation });
-      } else if (touchCount === 3) {
-        const [touch1, touch2, touch3] = event.touches;
-
-        setTouchPoints([
-          { x: touch1.clientX, y: touch1.clientY },
-          { x: touch2.clientX, y: touch2.clientY },
-          { x: touch3.clientX, y: touch3.clientY },
+        onNodesChange([
+          {
+            id: selectedNodeId,
+            type: "replace",
+            item: {
+              ...previousNode,
+              data: {
+                ...previousNode.data,
+                scale: scale,
+                rotation,
+              },
+            },
+          },
         ]);
+      } else if (touchCount === 3) {
+        const [touch1, , touch3] = points;
 
-        const angleRad = Math.atan2(
-          touch3.clientY - touch1.clientY,
-          touch3.clientX - touch1.clientX
+        const currentAngle = calculateAngle(touch1, touch3);
+        const angleDeg = Math.min(
+          30,
+          Math.abs(((currentAngle * 180) / Math.PI) % 360)
         );
 
-        let angleDeg = Math.abs(((angleRad * 180) / Math.PI) % 360);
-
-        if (angleDeg > 30) {
-          angleDeg = 30;
-        }
-
         let selectedVertex;
-        if (angleDeg <= 6) {
-          selectedVertex = Vertex.circle;
-        } else if (angleDeg <= 12) {
-          selectedVertex = Vertex.square;
-        } else if (angleDeg <= 18) {
-          selectedVertex = Vertex.pentagon;
-        } else if (angleDeg <= 24) {
-          selectedVertex = Vertex.hexagon;
-        } else {
-          selectedVertex = Vertex.star;
-        }
 
-        updateShape(selectedShapeIndex, { vertex: selectedVertex });
-      } else if (touchCount === 4) {
-        const [touch1, touch2, touch3, touch4] = event.touches;
+        if (angleDeg <= 3) selectedVertex = ShapeTypeConst.circle;
+        else if (angleDeg <= 6) selectedVertex = ShapeTypeConst.roundRectangle;
+        else if (angleDeg <= 9) selectedVertex = ShapeTypeConst.rectangle;
+        else if (angleDeg <= 12) selectedVertex = ShapeTypeConst.pentagon;
+        else if (angleDeg <= 15) selectedVertex = ShapeTypeConst.hexagon;
+        else if (angleDeg <= 18) selectedVertex = ShapeTypeConst.arrowRectangle;
+        else if (angleDeg <= 21) selectedVertex = ShapeTypeConst.cylinder;
+        else if (angleDeg <= 24) selectedVertex = ShapeTypeConst.triangle;
+        else if (angleDeg <= 27) selectedVertex = ShapeTypeConst.parallelogram;
+        else if (angleDeg <= 30) selectedVertex = ShapeTypeConst.star;
+        else selectedVertex = ShapeTypeConst.plus;
 
-        setTouchPoints([
-          { x: touch1.clientX, y: touch1.clientY },
-          { x: touch2.clientX, y: touch2.clientY },
-          { x: touch3.clientX, y: touch3.clientY },
-          { x: touch4.clientX, y: touch4.clientY },
+        onNodesChange([
+          {
+            id: selectedNodeId,
+            type: "replace",
+            item: {
+              ...previousNode,
+              data: {
+                ...previousNode.data,
+                type: selectedVertex,
+              },
+            },
+          },
         ]);
-
-        const points = [
-          { x: touch1.clientX, y: touch1.clientY },
-          { x: touch2.clientX, y: touch2.clientY },
-          { x: touch3.clientX, y: touch3.clientY },
-          { x: touch4.clientX, y: touch4.clientY },
-        ];
-
-        const minX = Math.min(...points.map((point) => point.x));
-        const maxX = Math.max(...points.map((point) => point.x));
-        const minY = Math.min(...points.map((point) => point.y));
-        const maxY = Math.max(...points.map((point) => point.y));
+      } else if (touchCount === 4) {
+        const minX = Math.min(...points.map((p) => p.x));
+        const maxX = Math.max(...points.map((p) => p.x));
+        const minY = Math.min(...points.map((p) => p.y));
+        const maxY = Math.max(...points.map((p) => p.y));
 
         const size = {
-          w: Math.max(100, (maxX - minX) / 2),
+          w: Math.max(100, maxX - minX),
           h: Math.max(100, maxY - minY),
         };
 
-        updateShape(selectedShapeIndex, { size });
-      } else if (touchCount === 5) {
-        const [touch1, touch2, touch3, touch4, touch5] = event.touches;
-
-        setTouchPoints([
-          { x: touch1.clientX, y: touch1.clientY },
-          { x: touch2.clientX, y: touch2.clientY },
-          { x: touch3.clientX, y: touch3.clientY },
-          { x: touch4.clientX, y: touch4.clientY },
-          { x: touch5.clientX, y: touch5.clientY },
+        onNodesChange([
+          {
+            id: selectedNodeId,
+            type: "replace",
+            item: {
+              ...previousNode,
+              data: {
+                ...previousNode.data,
+                size,
+              },
+            },
+          },
         ]);
+      } else if (touchCount === 5) {
+        const [touch1, , , , touch5] = points;
 
-        const distance = Math.hypot(
-          touch5.clientX - touch1.clientX,
-          touch5.clientY - touch1.clientY
-        );
+        const d = calculateDistance(touch1, touch5);
 
-        let selectedColor;
+        const colorThresholds: {
+          threshold: number;
+          color: Color;
+        }[] = [
+          { threshold: 150, color: ColorType.red },
+          { threshold: 200, color: ColorType.yellow },
+          { threshold: 250, color: ColorType.blue },
+          { threshold: 300, color: ColorType.skyBlue },
+          { threshold: 340, color: ColorType.lime },
+          { threshold: 380, color: ColorType.pink },
+          { threshold: 420, color: ColorType.purple },
+          { threshold: 500, color: ColorType.brown },
+          { threshold: Infinity, color: ColorType.transparent },
+        ];
 
-        if (distance < 300) {
-          selectedColor = ColorType.blue;
-        } else if (distance < 340) {
-          selectedColor = ColorType.green;
-        } else if (distance < 380) {
-          selectedColor = ColorType.pink;
-        } else if (distance < 420) {
-          selectedColor = ColorType.purple;
-        } else if (distance < 460) {
-          selectedColor = ColorType.yellow;
-        } else {
-          selectedColor = ColorType.transparent;
-        }
+        const selectedColor =
+          colorThresholds.find((threshold) => d < threshold.threshold)?.color ||
+          ColorType.transparent;
 
-        updateShape(selectedShapeIndex, { color: selectedColor });
+        onNodesChange([
+          {
+            id: selectedNodeId,
+            type: "replace",
+            item: {
+              ...previousNode,
+              data: {
+                ...previousNode.data,
+                color: selectedColor,
+              },
+            },
+          },
+        ]);
       }
     },
-    [isActive, selectedShapeIndex, updateShape]
+    [isActive, selectedNodeId, nodes, onNodesChange]
   );
 
   const handleTouchEnd = useCallback(() => {
-    if (endTimer.current) {
-      clearTimeout(endTimer.current);
-    }
+    if (endTimer.current) clearTimeout(endTimer.current);
 
-    endTimer.current = setTimeout(() => {
-      initialDistance.current = null;
-      initialAngle.current = null;
-      setTouchPoints([]);
-      activeTouchType.current = null;
-    }, 300);
+    endTimer.current = setTimeout(resetMultiTouch, 500);
   }, []);
 
-  return { handleTouchMove, handleTouchEnd, touchPoints };
+  return {
+    handleTouchMove,
+    handleTouchEnd,
+    touchPoints,
+    isMultiTouchActive,
+  };
 }

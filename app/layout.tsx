@@ -18,7 +18,17 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body
+        style={{
+          WebkitUserSelect: "none",
+          KhtmlUserSelect: "none",
+          MozUserSelect: "none",
+          msUserSelect: "none",
+          userSelect: "none",
+        }}
+      >
+        {children}
+      </body>
     </html>
   );
 }

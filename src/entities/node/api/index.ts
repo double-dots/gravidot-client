@@ -1,7 +1,6 @@
 import { DBTable, supabase } from "@/shared/api/supabaseClient";
 import log from "@/shared/log";
-import { Shape } from "../model/shape";
-import { useNodesStore } from "../store";
+import { Shape } from "../model";
 
 const getCurrentTimestamp = () => new Date().toISOString();
 
@@ -22,9 +21,6 @@ export async function createNode(boardId: string, shape: Shape): Promise<void> {
     throw new Error("🚑 putNode Error: Node data is null");
   }
 
-  const newNode = { id: nodeData.id, boardId: boardId, shape: shape };
-
-  useNodesStore.getState().addNode(newNode);
   log.info(`✅🎶 putNode: ${nodeData.id}`);
 }
 
@@ -34,12 +30,7 @@ export const fetchNodesByBoardId = async (boardId: string): Promise<void> => {
     .select("id, shape")
     .eq("board_id", boardId);
 
-  if (error) {
-    useNodesStore.setState({ nodes: [] });
-  }
-
   if (data) {
-    useNodesStore.getState().addAllNodes(data);
     log.info(`✅🎶 Node fetched successfully: ${JSON.stringify(data)}`);
   }
 };
@@ -54,7 +45,6 @@ export async function deleteNode(nodeId: string): Promise<void> {
     throw new Error(`🚑 deleteNode Error: ${error.message}`);
   }
 
-  useNodesStore.getState().removeNode(nodeId);
   log.info(`✅🗑️ deleteNode: Node ${nodeId} deleted successfully`);
 }
 
@@ -90,6 +80,5 @@ export async function updateNodeShape(
     throw new Error(`🚑 updateNodeShape Error: ${updateError.message}`);
   }
 
-  useNodesStore.getState().updateNodeShape(nodeId, updatedShape);
   log.info(`✅📍 Node ${nodeId} updated to: ${JSON.stringify(updates)}`);
 }
